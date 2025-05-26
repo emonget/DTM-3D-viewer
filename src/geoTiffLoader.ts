@@ -1,10 +1,10 @@
 // geotiffLoader.ts - GeoTIFF loading and processing logic
 
+import * as GeoTIFF from 'geotiff';
 import type { DTMData, ElevationMetadata, GeoTIFFFile, GeoTIFFImage } from './types';
 
 export class GeoTIFFLoader {
   private static instance: GeoTIFFLoader;
-  private isLibraryLoaded = false;
 
   private constructor() {}
 
@@ -16,42 +16,17 @@ export class GeoTIFFLoader {
   }
 
   /**
-   * Ensures the GeoTIFF library is loaded
+   * Ensures the GeoTIFF library is loaded (no-op for npm package)
    */
   public async ensureLibraryLoaded(): Promise<void> {
-    if (this.isLibraryLoaded || window.GeoTIFF) {
-      this.isLibraryLoaded = true;
-      return;
-    }
-
-    return new Promise((resolve, reject) => {
-      const script = document.createElement('script');
-      script.src = 'https://cdnjs.cloudflare.com/ajax/libs/geotiff/2.0.7/geotiff.min.js';
-      
-      script.onload = () => {
-        this.isLibraryLoaded = true;
-        console.log('GeoTIFF library loaded successfully');
-        resolve();
-      };
-      
-      script.onerror = () => {
-        reject(new Error('Failed to load GeoTIFF library. Please check your internet connection.'));
-      };
-      
-      document.head.appendChild(script);
-    });
+    // No need to load library dynamically when using npm package
+    return Promise.resolve();
   }
 
   /**
    * Loads and processes a GeoTIFF file
    */
   public async loadGeoTIFF(file: File): Promise<DTMData> {
-    await this.ensureLibraryLoaded();
-
-    if (!window.GeoTIFF) {
-      throw new Error('GeoTIFF library not available');
-    }
-
     try {
       console.log('Loading file:', file.name, 'Size:', file.size, 'Type:', file.type);
 
@@ -59,8 +34,8 @@ export class GeoTIFFLoader {
       const arrayBuffer = await file.arrayBuffer();
       console.log('ArrayBuffer created, size:', arrayBuffer.byteLength);
 
-      // Parse GeoTIFF
-      const tiff: GeoTIFFFile = await window.GeoTIFF.fromArrayBuffer(arrayBuffer);
+      // Parse GeoTIFF using npm package
+      const tiff: GeoTIFFFile = await GeoTIFF.fromArrayBuffer(arrayBuffer);
       console.log('GeoTIFF object created');
 
       const image: GeoTIFFImage = await tiff.getImage();
@@ -75,7 +50,7 @@ export class GeoTIFFLoader {
       console.log('Dimensions:', width, 'x', height);
 
       // Extract elevation data (assuming single band DTM)
-      const elevationData = rasters[0];
+      const elevationData = rasters[0] as Float32Array;
       console.log('Elevation data extracted, length:', elevationData.length);
 
       // Calculate elevation statistics

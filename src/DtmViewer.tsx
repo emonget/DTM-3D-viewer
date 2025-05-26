@@ -1,10 +1,12 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import type {
   ElevationMetadata,
-  ColorScheme
+  ColorScheme,
+  DTMData,
+  RenderOptions
 } from './types';
-import { loadGeoTIFF, loadGeoTIFFLibrary } from './geoTiffLoader';
-import { renderDTMToCanvas, getElevationAtPoint } from './dtmRenderer';
+import { GeoTIFFLoader } from './geoTiffLoader';
+import { DTMRenderer } from './dtmRenderer';
 import {
   Header,
   FileUpload,
@@ -16,11 +18,7 @@ import {
 
 export const DTMGeoTIFFViewer: React.FC = () => {
   // State management
-  const [elevationData, setElevationData] = useState<Float32Array | null>(null);
-  const [minElevation, setMinElevation] = useState<number>(0);
-  const [maxElevation, setMaxElevation] = useState<number>(0);
-  const [dimensions, setDimensions] = useState<{ width: number; height: number }>({ width: 0, height: 0 });
-  const [metadata, setMetadata] = useState<ElevationMetadata>({ width: 0, height: 0 });
+  const [dtmData, setDtmData] = useState<DTMData | null>(null);
   const [colorScheme, setColorScheme] = useState<ColorScheme>('terrain');
   const [contrast, setContrast] = useState<number>(1);
   const [brightness, setBrightness] = useState<number>(0);
@@ -30,13 +28,14 @@ export const DTMGeoTIFFViewer: React.FC = () => {
 
   // Refs
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const geoTiffLoader = GeoTIFFLoader.getInstance();
 
   // Load GeoTIFF library on component mount
   useEffect(() => {
-    loadGeoTIFFLibrary().catch((err) => {
+    geoTiffLoader.ensureLibraryLoaded().catch((err) => {
       setError(err.message);
     });
-  }, []);
+  }, [geoTiffLoader]);
 
   // File loading handler
   const handleFileLoad = useCallback(async (file: File) => {
@@ -44,13 +43,8 @@ export const DTMGeoTIFFViewer: React.FC = () => {
       setLoading(true);
       setError('');
 
-      const result = await loadGeoTIFF(file);
-      
-      setElevationData(result.elevationData);
-      setMinElevation(result.minElevation);
-      setMaxElevation(result.maxElevation);
-      setDimensions(result.dimensions);
-      setMetadata(result.metadata);
+      const result = await geoTiffLoader.loadGeoTIFF(file);
+      setDtmData(result);
       setLoading(false);
 
     } catch (err) {
@@ -58,46 +52,49 @@ export const DTMGeoTIFFViewer: React.FC = () => {
       setError(`Failed to load GeoTIFF file: ${err instanceof Error ? err.message : 'Unknown error'}`);
       setLoading(false);
     }
-  }, []);
+  }, [geoTiffLoader]);
 
   // Rendering function
   const renderDTM = useCallback(async () => {
-    if (!elevationData || !canvasRef.current) return;
+    if (!dtmData || !canvasRef.current) return;
 
-    await renderDTMToCanvas(
-      canvasRef.current,
-      elevationData,
-      dimensions,
-      minElevation,
-      maxElevation,
+    const renderOptions: RenderOptions = {
       colorScheme,
       contrast,
       brightness
-    );
-  }, [elevationData, dimensions, minElevation, maxElevation, colorScheme, contrast, brightness]);
+    };
+
+    await DTMRenderer.renderToCanvas(canvasRef.current, dtmData, renderOptions);
+  }, [dtmData, colorScheme, contrast, brightness]);
 
   // Effect to re-render when parameters change
   useEffect(() => {
-    if (elevationData) {
+    if (dtmData) {
       renderDTM();
     }
-  }, [elevationData, colorScheme, contrast, brightness, renderDTM]);
+  }, [dtmData, colorScheme, contrast, brightness, renderDTM]);
 
   // Mouse move handler for elevation display
   const handleMouseMove = useCallback((event: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!elevationData || !canvasRef.current) return;
+    if (!dtmData || !canvasRef.current) return;
 
     const rect = canvasRef.current.getBoundingClientRect();
-    const x = event.clientX - rect.left;
-    const y = event.clientY - rect.top;
+    const canvasX = event.clientX - rect.left;
+    const canvasY = event.clientY - rect.top;
     
-    const elevation = getElevationAtPoint(
-      x,
-      y,
-      canvasRef.current.width,
-      canvasRef.current.height,
-      elevationData,
-      dimensions
+    // Convert canvas coordinates to data coordinates
+    const scaleX = dtmData.dimensions.width / canvasRef.current.width;
+    const scaleY = dtmData.dimensions.height / canvasRef.current.height;
+    
+    const dataX = Math.floor(canvasX * scaleX);
+    const dataY = Math.floor(canvasY * scaleY);
+    
+    const elevation = geoTiffLoader.getElevationAt(
+      dtmData.elevationData,
+      dataX,
+      dataY,
+      dtmData.dimensions.width,
+      dtmData.dimensions.height
     );
     
     if (elevation !== null) {
@@ -105,7 +102,7 @@ export const DTMGeoTIFFViewer: React.FC = () => {
     } else {
       setMouseElevation('No data');
     }
-  }, [elevationData, dimensions]);
+  }, [dtmData, geoTiffLoader]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-400 via-purple-500 to-purple-700 p-5">
@@ -131,23 +128,23 @@ export const DTMGeoTIFFViewer: React.FC = () => {
           </div>
         )}
 
-        {elevationData && (
+        {dtmData && (
           <div className="bg-white/95 backdrop-blur-sm rounded-2xl p-6 shadow-xl border border-white/20">
             <DTMCanvas
               canvasRef={canvasRef}
               onMouseMove={handleMouseMove}
               mouseElevation={mouseElevation}
               colorScheme={colorScheme}
-              minElevation={minElevation}
-              maxElevation={maxElevation}
+              minElevation={dtmData.minElevation}
+              maxElevation={dtmData.maxElevation}
               showLegend={true}
             />
 
             <InfoPanel
-              dimensions={dimensions}
-              minElevation={minElevation}
-              maxElevation={maxElevation}
-              metadata={metadata}
+              dimensions={dtmData.dimensions}
+              minElevation={dtmData.minElevation}
+              maxElevation={dtmData.maxElevation}
+              metadata={dtmData.metadata}
             />
           </div>
         )}
