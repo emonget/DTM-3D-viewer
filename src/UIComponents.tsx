@@ -1,5 +1,5 @@
 import React from 'react';
-import type { ElevationMetadata, ColorScheme } from './logic';
+import type { ElevationMetadata, ColorScheme } from './types';
 
 interface HeaderProps {}
 

@@ -2,13 +2,9 @@ import React, { useState, useRef, useCallback, useEffect } from 'react';
 import type {
   ElevationMetadata,
   ColorScheme
-} from './logic';
-import {
-  loadGeoTIFF,
-  renderDTMToCanvas,
-  getElevationAtPoint,
-  loadGeoTIFFLibrary
-} from './logic';
+} from './types';
+import { loadGeoTIFF, loadGeoTIFFLibrary } from './geoTiffLoader';
+import { renderDTMToCanvas, getElevationAtPoint } from './dtmRenderer';
 import {
   Header,
   FileUpload,
