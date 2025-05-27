@@ -238,10 +238,12 @@ export class DTMRenderer {
   }
 
   /**
-   * Rainbow color scheme using HSL conversion
+   * Rainbow color scheme using HSL conversion - corrected to match other schemes
    */
   private static getRainbowColor(normalized: number): ColorRGB {
-    const hue = normalized * 300; // 0 to 300 degrees
+    // Fixed: Low elevation (0) -> violet/blue, High elevation (1) -> red
+    // Using hue range from 240° (blue) to 0° (red)
+    const hue = (1 - normalized) * 240; // 240 to 0 degrees
     return this.hslToRgb(hue / 360, 1, 0.5);
   }
 
@@ -285,7 +287,7 @@ export class DTMRenderer {
       terrain: 'bg-gradient-to-t from-blue-600 via-green-600 via-amber-700 to-white',
       elevation: 'bg-gradient-to-t from-blue-900 via-blue-300 to-yellow-400',
       grayscale: 'bg-gradient-to-t from-black to-white',
-      rainbow: 'bg-gradient-to-t from-purple-500 via-blue-500 via-cyan-500 via-green-500 via-yellow-500 to-red-500'
+      rainbow: 'bg-gradient-to-t from-blue-500 via-cyan-500 via-green-500 via-yellow-500 to-red-500'
     };
 
     return gradients[colorScheme] || gradients.terrain;
