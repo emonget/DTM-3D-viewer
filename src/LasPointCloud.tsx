@@ -169,38 +169,28 @@ function PointCloud({ points, settings }: { points: LasPoint[]; settings: PointC
 
 export const LasPointCloud: React.FC<LasPointCloudProps> = ({ points, onLoaded }) => {
   const [isLoading, setIsLoading] = useState(true);
-  const [settings, setSettings] = useState<PointCloudSettings>(() => {
-    // Only include classifications that exist in the data
-    const uniqueClassifications = new Set(points.map(p => p.classification));
-    return {
-      pointSize: 0.02,
-      opacity: 1,
-      colorMode: 'classification',
-      maxPoints: null,
-      showGrid: true,
-      visibleClassifications: uniqueClassifications,
-    };
+  const [settings, setSettings] = useState<PointCloudSettings>({
+    pointSize: 0.05,
+    opacity: 1,
+    colorMode: 'classification',
+    maxPoints: null,
+    showGrid: true,
+    visibleClassifications: new Set(Array.from({ length: 256 }, (_, i) => i))
   });
 
-  // Calculate classification counts directly from points
-  const classificationCounts = useMemo(() => {
-    const counts: Record<number, number> = {};
-    for (const point of points) {
-      counts[point.classification] = (counts[point.classification] || 0) + 1;
-    }
-    return counts;
-  }, [points]);
+  const classificationCounts = points.reduce((acc, point) => {
+    acc[point.classification] = (acc[point.classification] || 0) + 1;
+    return acc;
+  }, {} as Record<number, number>);
 
   useEffect(() => {
-    if (points.length > 0) {
-      setIsLoading(false);
-      onLoaded?.();
-    }
+    setIsLoading(false);
+    onLoaded?.();
   }, [points, onLoaded]);
 
   return (
     <div className="relative w-full h-full">
-      <Canvas style={{ background: '#1a1a1a' }}>
+      <Canvas style={{ background: '#1c1c1c' }}>
         <PerspectiveCamera
           makeDefault
           position={[150, 150, 150]}
@@ -215,6 +205,9 @@ export const LasPointCloud: React.FC<LasPointCloudProps> = ({ points, onLoaded }
         <ambientLight intensity={0.5} />
         <directionalLight position={[10, 10, 5]} intensity={1} />
         <PointCloud points={points} settings={settings} />
+        {settings.showGrid && (
+          <gridHelper args={[500, 50]} position={[0, 0, 0]} />
+        )}
       </Canvas>
       <PointCloudControls
         settings={settings}

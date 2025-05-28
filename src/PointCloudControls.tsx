@@ -22,18 +22,15 @@ export const PointCloudControls: React.FC<PointCloudControlsProps> = ({
   settings,
   onSettingsChange,
   totalPoints,
-  classificationCounts,
+  classificationCounts
 }) => {
-  const [showClassifications, setShowClassifications] = useState(true);
+  const [showClassifications, setShowClassifications] = useState(false);
 
   const updateSetting = <K extends keyof PointCloudSettings>(
     key: K,
     value: PointCloudSettings[K]
   ) => {
-    onSettingsChange({
-      ...settings,
-      [key]: value,
-    });
+    onSettingsChange({ ...settings, [key]: value });
   };
 
   const toggleClassification = (classification: number) => {
@@ -46,34 +43,37 @@ export const PointCloudControls: React.FC<PointCloudControlsProps> = ({
     updateSetting('visibleClassifications', newVisibleClassifications);
   };
 
-  const formatPointCount = (count: number | null) => {
-    if (count === null) return 'All';
-    return count >= 1000000 
-      ? `${(count / 1000000).toFixed(1)}M` 
-      : `${(count / 1000).toFixed(0)}K`;
+  const formatPointCount = (count: number): string => {
+    if (count >= 1_000_000) {
+      return `${(count / 1_000_000).toFixed(1)}M`;
+    }
+    if (count >= 1_000) {
+      return `${(count / 1_000).toFixed(1)}K`;
+    }
+    return count.toString();
   };
 
   return (
-    <div className="absolute top-4 right-4 bg-gray-900 bg-opacity-90 rounded-lg p-4 text-white w-72 space-y-4 max-h-[calc(100vh-2rem)] overflow-y-auto">
+    <div className="absolute top-4 right-4 bg-zinc-800/90 rounded-lg p-4 text-zinc-100 w-72 space-y-4 max-h-[calc(100vh-2rem)] overflow-y-auto border border-zinc-700">
       <div className="flex items-center gap-2 mb-2">
-        <Settings className="w-4 h-4" />
+        <Settings className="w-4 h-4 text-zinc-300" />
         <h3 className="font-medium">Visualization Settings</h3>
       </div>
 
       {/* Classifications */}
-      <div className="space-y-2 bg-gray-800 rounded-lg p-3">
+      <div className="space-y-2 bg-zinc-700/50 rounded-lg p-3">
         <button
           onClick={() => setShowClassifications(!showClassifications)}
-          className="flex items-center justify-between w-full text-sm font-medium"
+          className="flex items-center justify-between w-full text-sm font-medium text-zinc-100"
         >
           <div className="flex items-center gap-2">
-            <Layers className="w-4 h-4" />
+            <Layers className="w-4 h-4 text-zinc-300" />
             <span>Classifications</span>
           </div>
           {showClassifications ? (
-            <ChevronUp className="w-4 h-4" />
+            <ChevronUp className="w-4 h-4 text-zinc-400" />
           ) : (
-            <ChevronDown className="w-4 h-4" />
+            <ChevronDown className="w-4 h-4 text-zinc-400" />
           )}
         </button>
         {showClassifications && (
@@ -88,7 +88,7 @@ export const PointCloudControls: React.FC<PointCloudControlsProps> = ({
                       type="checkbox"
                       checked={settings.visibleClassifications.has(parseInt(classification))}
                       onChange={() => toggleClassification(parseInt(classification))}
-                      className="rounded"
+                      className="rounded bg-zinc-600 border-zinc-500 text-zinc-300 focus:ring-zinc-500"
                     />
                     <div 
                       className="w-3 h-3 rounded-full" 
@@ -96,8 +96,8 @@ export const PointCloudControls: React.FC<PointCloudControlsProps> = ({
                         backgroundColor: `hsl(${(parseInt(classification) * 30) % 360}deg 100% 50%)` 
                       }} 
                     />
-                    <span className="flex-1">{LasFileParser.getClassificationName(parseInt(classification))}</span>
-                    <span className="text-gray-400 text-xs">
+                    <span className="flex-1 text-zinc-300">{LasFileParser.getClassificationName(parseInt(classification))}</span>
+                    <span className="text-zinc-400 text-xs">
                       {formatPointCount(count)}
                     </span>
                   </label>
@@ -111,10 +111,10 @@ export const PointCloudControls: React.FC<PointCloudControlsProps> = ({
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <label className="flex items-center gap-2">
-            <Eye className="w-4 h-4" />
+            <Eye className="w-4 h-4 text-zinc-300" />
             <span className="text-sm">Point Size</span>
           </label>
-          <span className="text-sm text-gray-400">{settings.pointSize.toFixed(3)}</span>
+          <span className="text-sm text-zinc-400">{settings.pointSize.toFixed(3)}</span>
         </div>
         <input
           type="range"
@@ -123,7 +123,7 @@ export const PointCloudControls: React.FC<PointCloudControlsProps> = ({
           step="0.01"
           value={settings.pointSize}
           onChange={(e) => updateSetting('pointSize', parseFloat(e.target.value))}
-          className="w-full"
+          className="w-full bg-zinc-700 rounded-lg appearance-none cursor-pointer"
         />
       </div>
 
@@ -131,10 +131,10 @@ export const PointCloudControls: React.FC<PointCloudControlsProps> = ({
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <label className="flex items-center gap-2">
-            <Droplet className="w-4 h-4" />
+            <Droplet className="w-4 h-4 text-zinc-300" />
             <span className="text-sm">Opacity</span>
           </label>
-          <span className="text-sm text-gray-400">{(settings.opacity * 100).toFixed(0)}%</span>
+          <span className="text-sm text-zinc-400">{(settings.opacity * 100).toFixed(0)}%</span>
         </div>
         <input
           type="range"
@@ -143,20 +143,20 @@ export const PointCloudControls: React.FC<PointCloudControlsProps> = ({
           step="0.1"
           value={settings.opacity}
           onChange={(e) => updateSetting('opacity', parseFloat(e.target.value))}
-          className="w-full"
+          className="w-full bg-zinc-700 rounded-lg appearance-none cursor-pointer"
         />
       </div>
 
       {/* Color Mode */}
       <div className="space-y-2">
         <label className="flex items-center gap-2">
-          <Palette className="w-4 h-4" />
+          <Palette className="w-4 h-4 text-zinc-300" />
           <span className="text-sm">Color Mode</span>
         </label>
         <select
           value={settings.colorMode}
           onChange={(e) => updateSetting('colorMode', e.target.value as PointCloudSettings['colorMode'])}
-          className="w-full bg-gray-800 text-white rounded px-2 py-1 text-sm"
+          className="w-full bg-zinc-700 text-zinc-100 rounded px-2 py-1 text-sm border border-zinc-600 focus:border-zinc-500 focus:ring-1 focus:ring-zinc-500"
         >
           <option value="classification">Classification</option>
           <option value="elevation">Elevation</option>
@@ -168,8 +168,8 @@ export const PointCloudControls: React.FC<PointCloudControlsProps> = ({
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <label className="text-sm">Point Limit</label>
-          <span className="text-sm text-gray-400">
-            {formatPointCount(settings.maxPoints)} / {formatPointCount(totalPoints)}
+          <span className="text-sm text-zinc-400">
+            {formatPointCount(settings.maxPoints ?? totalPoints)} / {formatPointCount(totalPoints)}
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -180,7 +180,7 @@ export const PointCloudControls: React.FC<PointCloudControlsProps> = ({
             step={10000}
             value={settings.maxPoints ?? totalPoints}
             onChange={(e) => updateSetting('maxPoints', parseInt(e.target.value))}
-            className="flex-1"
+            className="flex-1 bg-zinc-700 rounded-lg appearance-none cursor-pointer"
           />
           <button
             onClick={() => updateSetting('maxPoints', settings.maxPoints === null ? 1000000 : null)}
@@ -198,14 +198,14 @@ export const PointCloudControls: React.FC<PointCloudControlsProps> = ({
       {/* Grid */}
       <div className="flex items-center justify-between">
         <label className="flex items-center gap-2">
-          <Grid className="w-4 h-4" />
+          <Grid className="w-4 h-4 text-zinc-300" />
           <span className="text-sm">Show Grid</span>
         </label>
         <input
           type="checkbox"
           checked={settings.showGrid}
           onChange={(e) => updateSetting('showGrid', e.target.checked)}
-          className="rounded"
+          className="rounded bg-zinc-600 border-zinc-500 text-zinc-300 focus:ring-zinc-500"
         />
       </div>
     </div>
