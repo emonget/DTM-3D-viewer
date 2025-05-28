@@ -16,7 +16,9 @@ function PointCloud({ points, settings }: { points: LasPoint[]; settings: PointC
   const [isProcessing, setIsProcessing] = useState(true);
 
   const [positions, colors, bounds] = useMemo(() => {
-    const pointCount = settings.maxPoints === null ? points.length : Math.min(points.length, settings.maxPoints);
+    // Filter points based on visible classifications
+    const visiblePoints = points.filter(p => settings.visibleClassifications.has(p.classification));
+    const pointCount = settings.maxPoints === null ? visiblePoints.length : Math.min(visiblePoints.length, settings.maxPoints);
     console.log('Processing points for visualization:', pointCount);
     setIsProcessing(true);
     
@@ -30,8 +32,8 @@ function PointCloud({ points, settings }: { points: LasPoint[]; settings: PointC
     let minIntensity = Infinity, maxIntensity = -Infinity;
 
     // First pass: calculate bounds
-    for (let i = 0; i < points.length; i++) {
-      const point = points[i];
+    for (let i = 0; i < visiblePoints.length; i++) {
+      const point = visiblePoints[i];
       minX = Math.min(minX, point.x);
       maxX = Math.max(maxX, point.x);
       minY = Math.min(minY, point.y);
@@ -61,14 +63,14 @@ function PointCloud({ points, settings }: { points: LasPoint[]; settings: PointC
       
       for (let i = startIdx; i < endIdx; i++) {
         // If we're not showing all points, use a sampling strategy
-        const sourceIndex = settings.maxPoints === null ? i : Math.floor(i * (points.length / pointCount));
-        const point = points[sourceIndex];
+        const sourceIndex = settings.maxPoints === null ? i : Math.floor(i * (visiblePoints.length / pointCount));
+        const point = visiblePoints[sourceIndex];
         const i3 = i * 3;
         
         // Store normalized positions
-        positions[i3] = (point.x - centerX) * scale;
-        positions[i3 + 1] = (point.z - centerZ) * scale;
-        positions[i3 + 2] = (point.y - centerY) * scale;
+        positions[i3] = (point.y - centerY) * scale;     // Y becomes X (East-West)
+        positions[i3 + 1] = (point.z - centerZ) * scale; // Z becomes Y (height)
+        positions[i3 + 2] = (point.x - centerX) * scale; // X becomes Z (North-South)
 
         // Color based on selected mode
         let color: THREE.Color;
@@ -113,7 +115,7 @@ function PointCloud({ points, settings }: { points: LasPoint[]; settings: PointC
 
     setIsProcessing(false);
     return [positions, colors, { centerX, centerY, centerZ, scale }];
-  }, [points, settings.maxPoints, settings.colorMode]);
+  }, [points, settings.maxPoints, settings.colorMode, settings.visibleClassifications]);
 
   useEffect(() => {
     if (pointsRef.current && bounds) {
@@ -167,13 +169,23 @@ function PointCloud({ points, settings }: { points: LasPoint[]; settings: PointC
 
 export const LasPointCloud: React.FC<LasPointCloudProps> = ({ points, onLoaded }) => {
   const [isLoading, setIsLoading] = useState(true);
-  const [settings, setSettings] = useState<PointCloudSettings>({
-    pointSize: 1.5,
+  const [settings, setSettings] = useState<PointCloudSettings>(() => ({
+    pointSize: 0.1,
     opacity: 0.8,
     colorMode: 'classification',
-    maxPoints: null, // Show all points by default
+    maxPoints: null,
     showGrid: true,
-  });
+    visibleClassifications: new Set(Array.from({ length: 13 }, (_, i) => i)), // Show all classifications by default
+  }));
+
+  // Calculate classification counts
+  const classificationCounts = useMemo(() => {
+    const counts: Record<number, number> = {};
+    for (const point of points) {
+      counts[point.classification] = (counts[point.classification] || 0) + 1;
+    }
+    return counts;
+  }, [points]);
 
   useEffect(() => {
     if (points.length > 0) {
@@ -204,6 +216,7 @@ export const LasPointCloud: React.FC<LasPointCloudProps> = ({ points, onLoaded }
         settings={settings}
         onSettingsChange={setSettings}
         totalPoints={points.length}
+        classificationCounts={classificationCounts}
       />
       {isLoading && (
         <div className="absolute inset-0 flex items-center justify-center bg-gray-900 bg-opacity-75">
