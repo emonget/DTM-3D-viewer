@@ -4,6 +4,7 @@ import { LasParser } from './LasParser';
 import type { LasData } from './LasParser';
 import { LasMap } from './LasMap';
 import { LasPointCloud } from './LasPointCloud';
+import { LazParser } from './LazParser';
 
 export const LasViewer: React.FC = () => {
   const [lasData, setLasData] = useState<LasData | null>(null);
@@ -16,8 +17,9 @@ export const LasViewer: React.FC = () => {
     const file = event.target.files?.[0];
     if (!file) return;
 
-    if (!file.name.toLowerCase().endsWith('.las')) {
-      setError('Please select a valid LAS file (.las extension)');
+    const fileExt = file.name.toLowerCase();
+    if (!fileExt.endsWith('.las') && !fileExt.endsWith('.laz')) {
+      setError('Please select a valid LAS/LAZ file (.las or .laz extension)');
       return;
     }
 
@@ -27,11 +29,12 @@ export const LasViewer: React.FC = () => {
 
     try {
       const arrayBuffer = await file.arrayBuffer();
-      const parser = new LasParser(arrayBuffer);
-      const data = parser.parse();
+      const isLaz = fileExt.endsWith('.laz');
+      const parser = isLaz ? new LazParser(arrayBuffer) : new LasParser(arrayBuffer);
+      const data = await parser.parse();
       setLasData(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to parse LAS file');
+      setError(err instanceof Error ? err.message : 'Failed to parse LAS/LAZ file');
     } finally {
       setLoading(false);
     }
@@ -69,7 +72,7 @@ export const LasViewer: React.FC = () => {
           <input
             ref={fileInputRef}
             type="file"
-            accept=".las"
+            accept=".las,.laz"
             onChange={handleFileUpload}
             className="hidden"
           />
@@ -78,7 +81,7 @@ export const LasViewer: React.FC = () => {
             disabled={loading}
             className="bg-blue-600 hover:bg-blue-700 disabled:bg-blue-400 text-white px-4 py-2 rounded-lg font-medium transition-colors text-sm"
           >
-            {loading ? 'Processing...' : 'Load LAS File'}
+            {loading ? 'Processing...' : 'Load LAS/LAZ File'}
           </button>
 
           {/* Tab Buttons */}

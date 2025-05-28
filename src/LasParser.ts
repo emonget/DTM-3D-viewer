@@ -90,10 +90,10 @@ export interface LasHeader {
   }
   
   export class LasParser {
-    private dataView: DataView;
-    private littleEndian: boolean = true;
+    protected dataView: DataView;
+    protected littleEndian: boolean = true;
     private coordinateInfo?: CoordinateInfo;
-    private statistics: {
+    protected statistics: {
       totalPoints: number;
       boundingBox: {
         minX: number;
@@ -134,13 +134,13 @@ export interface LasHeader {
       };
     }
   
-    public parse(): LasData {
+    public async parse(): Promise<LasData> {
       try {
-        console.log('Starting to parse LAS file...');
+        console.log('Starting to parse LAS/LAZ file...');
         const header = this.parseHeader();
         console.log('Header parsed:', header);
         
-        const points = this.parsePoints(header);
+        const points = await this.parsePoints(header);
         
         const coordinateInfo = this.detectUTMZone(
           (header.maxX + header.minX) / 2,
@@ -156,7 +156,7 @@ export interface LasHeader {
           }
         };
       } catch (error) {
-        console.error('Error parsing LAS file:', error);
+        console.error('Error parsing LAS/LAZ file:', error);
         throw error;
       }
     }
@@ -227,7 +227,7 @@ export interface LasHeader {
       };
     }
   
-    private parsePoints(header: LasHeader): LasPoint[] {
+    protected async parsePoints(header: LasHeader) {
       const points: LasPoint[] = [];
       const pointSize = header.pointDataRecordLength;
       
@@ -282,52 +282,59 @@ export interface LasHeader {
       return points;
     }
   
-    private parsePoint(offset: number, header: LasHeader): LasPoint {
-      // Parse basic point data (format 0)
-      const rawX = this.dataView.getUint32(offset, this.littleEndian);
-      const rawY = this.dataView.getUint32(offset + 4, this.littleEndian);
-      const rawZ = this.dataView.getUint32(offset + 8, this.littleEndian);
-  
-      const x = rawX * header.xScaleFactor + header.xOffset;
-      const y = rawY * header.yScaleFactor + header.yOffset;
-      const z = rawZ * header.zScaleFactor + header.zOffset;
-  
-      const intensity = this.dataView.getUint16(offset + 12, this.littleEndian);
-      const returnInfo = this.dataView.getUint8(offset + 14);
-      const flags = this.dataView.getUint8(offset + 15);
-      const classification = this.dataView.getUint8(offset + 16);
-      const scanAngleRank = this.dataView.getInt8(offset + 17);
-      const userData = this.dataView.getUint8(offset + 18);
-      const pointSourceId = this.dataView.getUint16(offset + 19, this.littleEndian);
-  
-      const point: LasPoint = {
+    protected parsePoint(offset: number, header: LasHeader, pointBuffer?: Uint8Array): LasPoint {
+      const view = pointBuffer ? 
+        new DataView(pointBuffer.buffer, pointBuffer.byteOffset, pointBuffer.byteLength) :
+        this.dataView;
+      
+      const offsetToUse = pointBuffer ? 0 : offset;
+
+      const x = view.getInt32(offsetToUse + 0, this.littleEndian) * header.xScaleFactor + header.xOffset;
+      const y = view.getInt32(offsetToUse + 4, this.littleEndian) * header.yScaleFactor + header.yOffset;
+      const z = view.getInt32(offsetToUse + 8, this.littleEndian) * header.zScaleFactor + header.zOffset;
+      const intensity = view.getUint16(offsetToUse + 12, this.littleEndian);
+      
+      const returnByte = view.getUint8(offsetToUse + 14);
+      const returnNumber = returnByte & 0x07;
+      const numberOfReturns = (returnByte >> 3) & 0x07;
+      const scanDirectionFlag = (returnByte >> 6) & 0x01;
+      const edgeOfFlightLine = (returnByte >> 7) & 0x01;
+      
+      const classification = view.getUint8(offsetToUse + 15);
+      const scanAngleRank = view.getInt8(offsetToUse + 16);
+      const userData = view.getUint8(offsetToUse + 17);
+      const pointSourceId = view.getUint16(offsetToUse + 18, this.littleEndian);
+      
+      let gpsTime: number | undefined;
+      let rgb: { red?: number; green?: number; blue?: number } = {};
+      
+      // Handle different point formats
+      if (header.pointDataRecordFormat === 1 || header.pointDataRecordFormat === 3) {
+        gpsTime = view.getFloat64(offsetToUse + 20, this.littleEndian);
+      }
+      
+      if (header.pointDataRecordFormat === 2 || header.pointDataRecordFormat === 3) {
+        rgb.red = view.getUint16(offsetToUse + (header.pointDataRecordFormat === 3 ? 28 : 20), this.littleEndian);
+        rgb.green = view.getUint16(offsetToUse + (header.pointDataRecordFormat === 3 ? 30 : 22), this.littleEndian);
+        rgb.blue = view.getUint16(offsetToUse + (header.pointDataRecordFormat === 3 ? 32 : 24), this.littleEndian);
+      }
+      
+      return {
         x,
         y,
         z,
         intensity,
-        returnNumber: returnInfo & 0x07,
-        numberOfReturns: (returnInfo >> 3) & 0x07,
-        scanDirectionFlag: flags & 0x01,
-        edgeOfFlightLine: (flags >> 1) & 0x01,
+        returnNumber,
+        numberOfReturns,
+        scanDirectionFlag,
+        edgeOfFlightLine,
         classification,
         scanAngleRank,
         userData,
-        pointSourceId
+        pointSourceId,
+        gpsTime,
+        ...rgb
       };
-  
-      // Add additional fields based on point data format
-      if (header.pointDataRecordFormat >= 1) {
-        point.gpsTime = this.dataView.getFloat64(offset + 20, this.littleEndian);
-      }
-  
-      if (header.pointDataRecordFormat >= 2) {
-        const colorOffset = header.pointDataRecordFormat === 2 ? 20 : 28;
-        point.red = this.dataView.getUint16(offset + colorOffset, this.littleEndian);
-        point.green = this.dataView.getUint16(offset + colorOffset + 2, this.littleEndian);
-        point.blue = this.dataView.getUint16(offset + colorOffset + 4, this.littleEndian);
-      }
-  
-      return point;
     }
   
     private detectUTMZone(centerX: number, centerY: number): CoordinateInfo {
@@ -423,4 +430,5 @@ export interface LasHeader {
       const [lon, lat] = proj4(utmProj, wgs84, [x, y]);
       return { latitude: lat, longitude: lon };
     }
+  
   }
