@@ -1,10 +1,10 @@
 import React, { useState, useRef } from 'react';
 import { Upload, FileText, Info, MapPin, Layers, BarChart3, Globe2, ChevronLeft, ChevronRight } from 'lucide-react';
-import { LasParser } from './LasParser';
-import type { LasData } from './LasParser';
+import { LasFileParser } from './LasFileParser';
+import type { LasData } from './LasFileParser';
 import { LasMap } from './LasMap';
 import { LasPointCloud } from './LasPointCloud';
-import { LazParser } from './LazParser';
+import { LazFileParser } from './LazFileParser';
 
 export const LasViewer: React.FC = () => {
   const [lasData, setLasData] = useState<LasData | null>(null);
@@ -28,9 +28,8 @@ export const LasViewer: React.FC = () => {
     setLasData(null);
 
     try {
-      const arrayBuffer = await file.arrayBuffer();
       const isLaz = fileExt.endsWith('.laz');
-      const parser = isLaz ? new LazParser(arrayBuffer) : new LasParser(arrayBuffer);
+      const parser = isLaz ? new LazFileParser(file) : new LasFileParser(file);
       const data = await parser.parse();
       setLasData(data);
     } catch (err) {
@@ -208,7 +207,7 @@ export const LasViewer: React.FC = () => {
                                   backgroundColor: `hsl(${(parseInt(classification) * 30) % 360}deg 100% 50%)` 
                                 }} 
                               />
-                              <span className="text-gray-600">{LasParser.getClassificationName(parseInt(classification))}</span>
+                              <span className="text-gray-600">{LasFileParser.getClassificationName(parseInt(classification))}</span>
                             </div>
                             <span className="font-medium">{formatNumber(count, 0)}</span>
                           </div>

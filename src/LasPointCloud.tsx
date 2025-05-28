@@ -2,7 +2,7 @@ import React, { useRef, useMemo, useEffect, useState } from 'react';
 import { Canvas, useThree } from '@react-three/fiber';
 import { OrbitControls, PerspectiveCamera, Grid as DreiGrid } from '@react-three/drei';
 import * as THREE from 'three';
-import type { LasPoint } from './LasParser';
+import type { LasPoint } from './LasFileParser';
 import { PointCloudControls, type PointCloudSettings } from './PointCloudControls';
 
 interface LasPointCloudProps {
@@ -173,8 +173,8 @@ export const LasPointCloud: React.FC<LasPointCloudProps> = ({ points, onLoaded }
     // Only include classifications that exist in the data
     const uniqueClassifications = new Set(points.map(p => p.classification));
     return {
-      pointSize: 0.1,
-      opacity: 0.8,
+      pointSize: 0.02,
+      opacity: 1,
       colorMode: 'classification',
       maxPoints: null,
       showGrid: true,

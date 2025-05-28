@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Settings, Eye, Droplet, Grid, Palette, ChevronDown, ChevronUp, Layers } from 'lucide-react';
-import { LasParser } from './LasParser';
+import { LasFileParser } from './LasFileParser';
 
 export interface PointCloudSettings {
   pointSize: number;
@@ -96,7 +96,7 @@ export const PointCloudControls: React.FC<PointCloudControlsProps> = ({
                         backgroundColor: `hsl(${(parseInt(classification) * 30) % 360}deg 100% 50%)` 
                       }} 
                     />
-                    <span className="flex-1">{LasParser.getClassificationName(parseInt(classification))}</span>
+                    <span className="flex-1">{LasFileParser.getClassificationName(parseInt(classification))}</span>
                     <span className="text-gray-400 text-xs">
                       {formatPointCount(count)}
                     </span>
