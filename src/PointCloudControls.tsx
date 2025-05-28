@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Settings, Eye, Droplet, Grid, Palette, ChevronDown, ChevronUp, Layers } from 'lucide-react';
+import { LasParser } from './LasParser';
 
 export interface PointCloudSettings {
   pointSize: number;
@@ -52,25 +53,6 @@ export const PointCloudControls: React.FC<PointCloudControlsProps> = ({
       : `${(count / 1000).toFixed(0)}K`;
   };
 
-  const getClassificationName = (classification: number): string => {
-    const classifications: Record<number, string> = {
-      0: 'Created, never classified',
-      1: 'Unclassified',
-      2: 'Ground',
-      3: 'Low Vegetation',
-      4: 'Medium Vegetation',
-      5: 'High Vegetation',
-      6: 'Building',
-      7: 'Low Point (noise)',
-      8: 'Model Key-point',
-      9: 'Water',
-      10: 'Reserved',
-      11: 'Reserved',
-      12: 'Overlap Points'
-    };
-    return classifications[classification] || `User Defined (${classification})`;
-  };
-
   return (
     <div className="absolute top-4 right-4 bg-gray-900 bg-opacity-90 rounded-lg p-4 text-white w-72 space-y-4 max-h-[calc(100vh-2rem)] overflow-y-auto">
       <div className="flex items-center gap-2 mb-2">
@@ -98,6 +80,7 @@ export const PointCloudControls: React.FC<PointCloudControlsProps> = ({
           <div className="space-y-2 mt-2">
             {Object.entries(classificationCounts)
               .sort(([a], [b]) => parseInt(a) - parseInt(b))
+              .filter(([_, count]) => count > 0)
               .map(([classification, count]) => (
                 <div key={classification} className="flex items-center gap-2">
                   <label className="flex items-center gap-2 text-sm flex-1">
@@ -113,7 +96,7 @@ export const PointCloudControls: React.FC<PointCloudControlsProps> = ({
                         backgroundColor: `hsl(${(parseInt(classification) * 30) % 360}deg 100% 50%)` 
                       }} 
                     />
-                    <span className="flex-1">{getClassificationName(parseInt(classification))}</span>
+                    <span className="flex-1">{LasParser.getClassificationName(parseInt(classification))}</span>
                     <span className="text-gray-400 text-xs">
                       {formatPointCount(count)}
                     </span>

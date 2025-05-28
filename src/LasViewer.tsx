@@ -67,7 +67,7 @@ export const LasViewer: React.FC = () => {
         <div className="flex-1 flex items-center gap-4">
           <h1 className="text-xl font-bold text-gray-900 flex items-center gap-2">
             <Layers className="text-blue-600" />
-            LAS LIDAR Viewer
+            LIDAR LAS/LAZ File Viewer
           </h1>
           <input
             ref={fileInputRef}

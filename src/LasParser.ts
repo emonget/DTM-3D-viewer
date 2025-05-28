@@ -300,10 +300,10 @@ export interface LasHeader {
       const scanDirectionFlag = (returnByte >> 6) & 0x01;
       const edgeOfFlightLine = (returnByte >> 7) & 0x01;
       
-      const classification = view.getUint8(offsetToUse + 15);
-      const scanAngleRank = view.getInt8(offsetToUse + 16);
-      const userData = view.getUint8(offsetToUse + 17);
-      const pointSourceId = view.getUint16(offsetToUse + 18, this.littleEndian);
+      const classification = view.getUint8(offsetToUse + 16);
+      const scanAngleRank = view.getInt8(offsetToUse + 17);
+      const userData = view.getUint8(offsetToUse + 18);
+      const pointSourceId = view.getUint16(offsetToUse + 19, this.littleEndian);
       
       let gpsTime: number | undefined;
       let rgb: { red?: number; green?: number; blue?: number } = {};

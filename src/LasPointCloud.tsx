@@ -169,16 +169,20 @@ function PointCloud({ points, settings }: { points: LasPoint[]; settings: PointC
 
 export const LasPointCloud: React.FC<LasPointCloudProps> = ({ points, onLoaded }) => {
   const [isLoading, setIsLoading] = useState(true);
-  const [settings, setSettings] = useState<PointCloudSettings>(() => ({
-    pointSize: 0.1,
-    opacity: 0.8,
-    colorMode: 'classification',
-    maxPoints: null,
-    showGrid: true,
-    visibleClassifications: new Set(Array.from({ length: 13 }, (_, i) => i)), // Show all classifications by default
-  }));
+  const [settings, setSettings] = useState<PointCloudSettings>(() => {
+    // Only include classifications that exist in the data
+    const uniqueClassifications = new Set(points.map(p => p.classification));
+    return {
+      pointSize: 0.1,
+      opacity: 0.8,
+      colorMode: 'classification',
+      maxPoints: null,
+      showGrid: true,
+      visibleClassifications: uniqueClassifications,
+    };
+  });
 
-  // Calculate classification counts
+  // Calculate classification counts directly from points
   const classificationCounts = useMemo(() => {
     const counts: Record<number, number> = {};
     for (const point of points) {
