@@ -1,4 +1,4 @@
-// dtm3DRenderer.ts - DTM 3D mesh rendering using Three.js
+// dtm3DRenderer.ts - DTM 3D mesh rendering using Three.js (Fixed Shading)
 
 import * as THREE from 'three';
 import CameraControls from 'camera-controls';
@@ -45,8 +45,18 @@ export class DTM3DRenderer {
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
     this.renderer.setSize(container.clientWidth, container.clientHeight);
     this.renderer.setClearColor(0x87CEEB, 1); // Sky blue background
+    
+    // Enhanced shadow settings
     this.renderer.shadowMap.enabled = true;
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap; // Soft shadows
+    this.renderer.shadowMap.autoUpdate = true;
+    
+    // Enable tone mapping for better lighting
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.2;
+    
+    // Enable physically correct lighting
+    this.renderer.physicallyCorrectLights = true;
 
     container.appendChild(this.renderer.domElement);
 
@@ -59,26 +69,62 @@ export class DTM3DRenderer {
   }
 
   /**
-   * Sets up basic lighting for the 3D scene
+   * Sets up enhanced lighting with dramatic shadows for the 3D scene
    */
   private setupLighting(): void {
-    // Ambient light for overall illumination
-    const ambientLight = new THREE.AmbientLight(0x404040, 0.8);
+    // Ambient light for overall illumination (reduced to make shadows more dramatic)
+    const ambientLight = new THREE.AmbientLight(0x404040, 0.4);
     this.scene.add(ambientLight);
 
-    // Directional light for shadows and definition
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
-    directionalLight.position.set(50, 100, 50);
-    directionalLight.castShadow = true;
-    directionalLight.shadow.mapSize.width = 2048;
-    directionalLight.shadow.mapSize.height = 2048;
-    directionalLight.shadow.camera.near = 0.5;
-    directionalLight.shadow.camera.far = 500;
-    directionalLight.shadow.camera.left = -100;
-    directionalLight.shadow.camera.right = 100;
-    directionalLight.shadow.camera.top = 100;
-    directionalLight.shadow.camera.bottom = -100;
-    this.scene.add(directionalLight);
+    // Main sun light - creates primary shadows
+    const sunLight = new THREE.DirectionalLight(0xfff5e6, 1.2); // Warm sunlight
+    sunLight.position.set(100, 150, 50);
+    sunLight.castShadow = true;
+    
+    // Enhanced shadow settings for better quality
+    sunLight.shadow.mapSize.width = 4096;
+    sunLight.shadow.mapSize.height = 4096;
+    sunLight.shadow.camera.near = 0.1;
+    sunLight.shadow.camera.far = 800;
+    sunLight.shadow.camera.left = -200;
+    sunLight.shadow.camera.right = 200;
+    sunLight.shadow.camera.top = 200;
+    sunLight.shadow.camera.bottom = -200;
+    sunLight.shadow.bias = -0.0001; // Reduces shadow acne
+    sunLight.shadow.normalBias = 0.02; // Additional shadow improvement
+    
+    this.scene.add(sunLight);
+
+    // Secondary rim light for dramatic effect
+    const rimLight = new THREE.DirectionalLight(0xe6f3ff, 0.6); // Cool blue rim light
+    rimLight.position.set(-80, 120, -60);
+    rimLight.castShadow = true;
+    
+    // Softer shadows for rim light
+    rimLight.shadow.mapSize.width = 2048;
+    rimLight.shadow.mapSize.height = 2048;
+    rimLight.shadow.camera.near = 0.1;
+    rimLight.shadow.camera.far = 600;
+    rimLight.shadow.camera.left = -150;
+    rimLight.shadow.camera.right = 150;
+    rimLight.shadow.camera.top = 150;
+    rimLight.shadow.camera.bottom = -150;
+    rimLight.shadow.bias = -0.0001;
+    rimLight.shadow.normalBias = 0.02;
+    
+    this.scene.add(rimLight);
+
+    // Fill light from below (subtle) - simulates bounced light
+    const fillLight = new THREE.DirectionalLight(0xffffff, 0.2);
+    fillLight.position.set(0, -50, 0);
+    // No shadows for fill light to keep it subtle
+    this.scene.add(fillLight);
+
+    // Add hemisphere light for more realistic sky lighting
+    const hemisphereLight = new THREE.HemisphereLight(0x87CEEB, 0x8B4513, 0.3); // Sky blue to brown
+    this.scene.add(hemisphereLight);
+
+    console.log('Enhanced lighting setup with dramatic shadows completed');
   }
 
   /**
@@ -184,11 +230,12 @@ export class DTM3DRenderer {
       meshResolution
     );
 
-    // Create terrain material with vertex colors
+    // Create terrain material with vertex colors and enhanced shading for shadows
     const material = new THREE.MeshLambertMaterial({
       vertexColors: true,
       wireframe,
-      side: THREE.DoubleSide
+      side: THREE.DoubleSide,
+      flatShading: false, // Ensure smooth shading
     });
 
     // Apply colors to vertices
@@ -196,8 +243,8 @@ export class DTM3DRenderer {
 
     // Create and add terrain mesh
     this.terrainMesh = new THREE.Mesh(geometry, material);
-    this.terrainMesh.receiveShadow = true;
-    this.terrainMesh.castShadow = true;
+    this.terrainMesh.receiveShadow = true; // Receive shadows from lights
+    this.terrainMesh.castShadow = true;    // Cast shadows onto other objects
 
     // Position the terrain
     this.terrainMesh.rotation.x = -Math.PI / 2; // Rotate to make it horizontal
@@ -247,7 +294,7 @@ export class DTM3DRenderer {
   }
 
   /**
-   * Creates terrain geometry from elevation data
+   * Creates terrain geometry from elevation data with proper normal calculation
    */
   private createTerrainGeometry(
     elevationData: Float32Array,
@@ -284,40 +331,128 @@ export class DTM3DRenderer {
       return geometry;
     }
 
+    // Store elevation data for proper normal calculation
+    const elevationGrid: number[][] = [];
+    for (let y = 0; y <= heightSegments; y++) {
+      elevationGrid[y] = [];
+      for (let x = 0; x <= widthSegments; x++) {
+        const normalizedX = x / widthSegments;
+        const normalizedY = y / heightSegments;
+
+        const dataX = Math.floor(normalizedX * (dimensions.width - 1));
+        const dataY = Math.floor((1 - normalizedY) * (dimensions.height - 1));
+
+        const clampedX = Math.max(0, Math.min(dimensions.width - 1, dataX));
+        const clampedY = Math.max(0, Math.min(dimensions.height - 1, dataY));
+
+        const elevationIndex = clampedY * dimensions.width + clampedX;
+        const elevation = elevationData[elevationIndex];
+
+        if (this.isValidElevation(elevation)) {
+          const normalizedElevation = (elevation - minElevation) / elevRange;
+          elevationGrid[y][x] = normalizedElevation * elevRange * verticalScale;
+        } else {
+          elevationGrid[y][x] = 0;
+        }
+      }
+    }
+
+    // Apply elevations to vertices
     for (let i = 0; i < vertices.count; i++) {
       const x = vertices.getX(i);
       const y = vertices.getY(i);
 
-      // Convert geometry coordinates to data array indices
-      const normalizedX = (x / terrainWidth) + 0.5; // Convert from [-0.5, 0.5] to [0, 1]
+      // Convert geometry coordinates to grid indices
+      const normalizedX = (x / terrainWidth) + 0.5;
       const normalizedY = (y / terrainHeight) + 0.5;
 
-      const dataX = Math.floor(normalizedX * (dimensions.width - 1));
-      // FIX: Flip Y-coordinate to match 2D renderer orientation
-      const dataY = Math.floor((1 - normalizedY) * (dimensions.height - 1));
+      const gridX = Math.round(normalizedX * widthSegments);
+      const gridY = Math.round(normalizedY * heightSegments);
 
-      const clampedX = Math.max(0, Math.min(dimensions.width - 1, dataX));
-      const clampedY = Math.max(0, Math.min(dimensions.height - 1, dataY));
+      const clampedGridX = Math.max(0, Math.min(widthSegments, gridX));
+      const clampedGridY = Math.max(0, Math.min(heightSegments, gridY));
 
-      const elevationIndex = clampedY * dimensions.width + clampedX;
-      const elevation = elevationData[elevationIndex];
-
-      if (this.isValidElevation(elevation)) {
-        const normalizedElevation = (elevation - minElevation) / elevRange;
-        const height = normalizedElevation * elevRange * verticalScale;
-        vertices.setZ(i, height); // Z is up in the rotated plane
-      } else {
-        vertices.setZ(i, 0);
-      }
+      vertices.setZ(i, elevationGrid[clampedGridY][clampedGridX]);
     }
 
     vertices.needsUpdate = true;
-    geometry.computeVertexNormals();
+
+    // Calculate proper normals using the elevation grid
+    this.calculateCustomNormals(geometry, elevationGrid, widthSegments, heightSegments, terrainWidth, terrainHeight);
+
     geometry.computeBoundingBox();
 
-    console.log('Terrain geometry created with bounding box:', geometry.boundingBox);
+    console.log('Terrain geometry created with custom normals, bounding box:', geometry.boundingBox);
 
     return geometry;
+  }
+
+  /**
+   * Calculate custom normals for better shading consistency
+   */
+  private calculateCustomNormals(
+    geometry: THREE.PlaneGeometry,
+    elevationGrid: number[][],
+    widthSegments: number,
+    heightSegments: number,
+    terrainWidth: number,
+    terrainHeight: number
+  ): void {
+    const vertices = geometry.attributes.position;
+    const normals = new Float32Array(vertices.count * 3);
+
+    const stepX = terrainWidth / widthSegments;
+    const stepY = terrainHeight / heightSegments;
+
+    for (let i = 0; i < vertices.count; i++) {
+      const x = vertices.getX(i);
+      const y = vertices.getY(i);
+
+      // Convert to grid coordinates
+      const normalizedX = (x / terrainWidth) + 0.5;
+      const normalizedY = (y / terrainHeight) + 0.5;
+
+      const gridX = Math.round(normalizedX * widthSegments);
+      const gridY = Math.round(normalizedY * heightSegments);
+
+      // Calculate normal using neighboring heights
+      const leftHeight = this.getGridHeight(elevationGrid, gridX - 1, gridY, widthSegments, heightSegments);
+      const rightHeight = this.getGridHeight(elevationGrid, gridX + 1, gridY, widthSegments, heightSegments);
+      const topHeight = this.getGridHeight(elevationGrid, gridX, gridY - 1, widthSegments, heightSegments);
+      const bottomHeight = this.getGridHeight(elevationGrid, gridX, gridY + 1, widthSegments, heightSegments);
+
+      // Calculate tangent vectors
+      const tangentX = new THREE.Vector3(stepX * 2, 0, rightHeight - leftHeight);
+      const tangentY = new THREE.Vector3(0, stepY * 2, bottomHeight - topHeight);
+
+      // Cross product for normal
+      const normal = new THREE.Vector3().crossVectors(tangentX, tangentY).normalize();
+
+      // Transform normal for the rotated plane
+      normal.applyAxisAngle(new THREE.Vector3(1, 0, 0), -Math.PI / 2);
+
+      normals[i * 3] = normal.x;
+      normals[i * 3 + 1] = normal.y;
+      normals[i * 3 + 2] = normal.z;
+    }
+
+    geometry.setAttribute('normal', new THREE.BufferAttribute(normals, 3));
+    console.log('Applied custom normals to', vertices.count, 'vertices');
+  }
+
+  /**
+   * Get height from elevation grid with bounds checking
+   */
+  private getGridHeight(
+    elevationGrid: number[][],
+    x: number,
+    y: number,
+    widthSegments: number,
+    heightSegments: number
+  ): number {
+    const clampedX = Math.max(0, Math.min(widthSegments, x));
+    const clampedY = Math.max(0, Math.min(heightSegments, y));
+    return elevationGrid[clampedY] ? elevationGrid[clampedY][clampedX] || 0 : 0;
   }
 
   /**
@@ -375,7 +510,7 @@ export class DTM3DRenderer {
   }
 
   /**
-   * Adds a water plane at the specified level
+   * Adds a water plane at the specified level with proper shadow interaction
    */
   private addWaterPlane(dimensions: { width: number; height: number }, waterHeight: number): void {
     const waterGeometry = new THREE.PlaneGeometry(
@@ -393,6 +528,8 @@ export class DTM3DRenderer {
     this.waterMesh = new THREE.Mesh(waterGeometry, waterMaterial);
     this.waterMesh.position.y = waterHeight;
     this.waterMesh.rotation.x = -Math.PI / 2;
+    this.waterMesh.receiveShadow = true; // Water receives shadows from terrain
+    // Water doesn't cast shadows (looks more realistic)
     this.scene.add(this.waterMesh);
   }
 
